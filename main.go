@@ -25,7 +25,16 @@ func main() {
 
 	transcriber := NewWhisperClient(transcribeAPIKey, transcribeBaseURL, transcribeModel)
 
-	app := NewApp(store, transcriber, nil)
+	analyzeAPIKey := os.Getenv("ANALYZE_API_KEY")
+	if analyzeAPIKey == "" {
+		log.Fatal("ANALYZE_API_KEY is not set")
+	}
+	analyzeBaseURL := getEnv("ANALYZE_BASE_URL", "https://api.groq.com/openai/v1")
+	analyzeModel := getEnv("ANALYZE_MODEL", "llama-3.3-70b-versatile")
+
+	analyzer := NewGroqAnalyzer(analyzeAPIKey, analyzeBaseURL, analyzeModel)
+
+	app := NewApp(store, transcriber, analyzer)
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.Dir("static")))
 	app.registerRoutes(mux)
