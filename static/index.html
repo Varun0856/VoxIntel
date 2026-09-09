@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoxIntel</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>VoxIntel</h1>
+      <p class="subtitle">Record. Transcribe. Ask.</p>
+    </header>
+
+    <div id="errorBanner" class="error-banner hidden"></div>
+
+    <section class="recorder-card">
+      <div class="recorder-controls">
+        <button id="startBtn" class="btn btn-primary">Start Recording</button>
+        <button id="stopBtn" class="btn btn-danger" disabled>Stop Recording</button>
+        <span id="recStatus" class="rec-status">Idle</span>
+      </div>
+    </section>
+
+    <section id="sessionPanel" class="session-panel hidden">
+      <div class="panel-header">
+        <h2>Session</h2>
+        <span id="sessionStatus" class="status"></span>
+        <button id="exportBtn" class="btn btn-secondary" disabled>Export</button>
+      </div>
+
+      <div class="transcript-box">
+        <h3>Transcript</h3>
+        <p id="transcript" class="transcript-text">—</p>
+      </div>
+
+      <div class="prompt-box">
+        <input id="promptInput" type="text" placeholder="Ask about this transcript, e.g. 'top takeaways'" />
+        <button id="askBtn" class="btn btn-primary" disabled>Ask</button>
+      </div>
+
+      <div id="analyses" class="analyses"></div>
+    </section>
+
+    <section class="history">
+      <h2>Past Sessions</h2>
+      <ul id="sessionList" class="session-list"></ul>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

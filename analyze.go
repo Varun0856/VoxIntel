@@ -50,7 +50,7 @@ func (a *GroqAnalyzer) Analyze(ctx context.Context, transcript, prompt string) (
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		answer, err := a.doRequest(ctx, transcript, prompt)
-		if err != nil {
+		if err == nil {
 			return answer, nil
 		}
 		lastErr = err
@@ -90,7 +90,7 @@ func (a *GroqAnalyzer) doRequest(ctx context.Context, transcript, prompt string)
 		return "", fmt.Errorf("building request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer"+a.apiKey)
+	req.Header.Set("Authorization", "Bearer "+a.apiKey)
 
 	resp, err := a.client.Do(req)
 	if err != nil {
@@ -100,6 +100,14 @@ func (a *GroqAnalyzer) doRequest(ctx context.Context, transcript, prompt string)
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
+		return "", fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests {
+		return "", &transientError{err: fmt.Errorf("api returned %d: %s", resp.StatusCode, respBody)}
+	}
+
+	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("api returned %d: %s", resp.StatusCode, respBody)
 	}
 
