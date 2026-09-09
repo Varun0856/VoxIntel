@@ -16,7 +16,16 @@ func main() {
 		log.Fatalf("failed to initialize store: %v", err)
 	}
 
-	app := NewApp(store, nil, nil)
+	transcribeAPIKey := os.Getenv("TRANSCRIBE_API_KEY")
+	if transcribeAPIKey == "" {
+		log.Fatal("TRANSCRIBE_API_KEY is not set")
+	}
+	transcribeBaseURL := getEnv("TRANSCRIBE_BASE_URL", "https://api.groq.com/openai/v1")
+	transcribeModel := getEnv("TRANSCRIBE_MODEL", "whisper-large-v3")
+
+	transcriber := NewWhisperClient(transcribeAPIKey, transcribeBaseURL, transcribeModel)
+
+	app := NewApp(store, transcriber, nil)
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.Dir("static")))
 	app.registerRoutes(mux)
