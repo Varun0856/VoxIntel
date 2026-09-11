@@ -37,6 +37,7 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/sessions/{id}/audio", a.uploadAudio)
 	mux.HandleFunc("POST /api/sessions/{id}/analyze", a.analyzeSession)
 	mux.HandleFunc("GET /api/sessions/{id}/export", a.exportSession)
+	mux.HandleFunc("DELETE /api/sessions/{id}", a.deleteSession)
 }
 
 func writeJson(w http.ResponseWriter, status int, v any) {
@@ -185,6 +186,15 @@ func (a *App) exportSession(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/markdown")
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+sess.ID+".md\"")
 	w.Write([]byte(b.String()))
+}
+
+func (a *App) deleteSession(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := a.store.Delete(id); err != nil {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func extFromContentType(ct string) string {

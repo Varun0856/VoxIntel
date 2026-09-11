@@ -1,22 +1,52 @@
+const FIXED_PROMPT = "Generate a concise summary of the key takeaways and any action items from this discussion.";
+
 const els = {
   startBtn: document.getElementById('startBtn'),
   stopBtn: document.getElementById('stopBtn'),
+  recDot: document.getElementById('recDot'),
   recStatus: document.getElementById('recStatus'),
   sessionPanel: document.getElementById('sessionPanel'),
   sessionStatus: document.getElementById('sessionStatus'),
   transcript: document.getElementById('transcript'),
-  promptInput: document.getElementById('promptInput'),
-  askBtn: document.getElementById('askBtn'),
-  analyses: document.getElementById('analyses'),
+  summaryBtn: document.getElementById('summaryBtn'),
   exportBtn: document.getElementById('exportBtn'),
+  deleteBtn: document.getElementById('deleteBtn'),
+  summaryBox: document.getElementById('summaryBox'),
+  summaryText: document.getElementById('summaryText'),
   sessionList: document.getElementById('sessionList'),
+  historyEmpty: document.getElementById('historyEmpty'),
   errorBanner: document.getElementById('errorBanner'),
+  themeToggle: document.getElementById('themeToggle'),
+  iconMoon: document.getElementById('iconMoon'),
+  iconSun: document.getElementById('iconSun'),
 };
 
 let mediaRecorder = null;
 let recordedChunks = [];
 let currentSessionId = null;
 let pollHandle = null;
+
+// --- Theme ---
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  els.iconMoon.classList.toggle('hidden', theme === 'light');
+  els.iconSun.classList.toggle('hidden', theme === 'dark');
+  localStorage.setItem('voxintel-theme', theme);
+}
+
+(function initTheme() {
+  const saved = localStorage.getItem('voxintel-theme');
+  const preferred = saved || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  applyTheme(preferred);
+})();
+
+els.themeToggle.addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme');
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+});
+
+// --- Errors ---
 
 function showError(msg) {
   els.errorBanner.textContent = msg;
@@ -43,7 +73,7 @@ async function startRecording() {
   };
 
   mediaRecorder.onstop = async () => {
-    stream.getTracks().forEach((t) => t.stop()); // release the mic
+    stream.getTracks().forEach((t) => t.stop());
     const blob = new Blob(recordedChunks, { type: 'audio/webm' });
     await createSessionAndUpload(blob);
   };
@@ -51,7 +81,8 @@ async function startRecording() {
   mediaRecorder.start();
   els.startBtn.disabled = true;
   els.stopBtn.disabled = false;
-  els.recStatus.textContent = 'Recording...';
+  els.recDot.classList.remove('hidden');
+  els.recStatus.textContent = 'Recording';
 }
 
 function stopRecording() {
@@ -60,7 +91,8 @@ function stopRecording() {
   }
   els.startBtn.disabled = false;
   els.stopBtn.disabled = true;
-  els.recStatus.textContent = 'Processing...';
+  els.recDot.classList.add('hidden');
+  els.recStatus.textContent = 'Processing';
 }
 
 // --- Backend calls ---
@@ -82,8 +114,9 @@ async function createSessionAndUpload(blob) {
       throw new Error(body.error || 'Upload failed');
     }
 
-    els.recStatus.textContent = 'Uploaded. Transcribing...';
-    showSessionPanel();
+    els.recStatus.textContent = 'Idle';
+    resetSessionPanel();
+    els.sessionPanel.classList.remove('hidden');
     pollSession(session.id);
     loadSessionList();
   } catch (err) {
@@ -94,13 +127,12 @@ async function createSessionAndUpload(blob) {
 
 function pollSession(id) {
   if (pollHandle) clearInterval(pollHandle);
-  pollHandle = setInterval(async () => {
+  const poll = async () => {
     try {
       const resp = await fetch(`/api/sessions/${id}`);
       if (!resp.ok) throw new Error('Failed to fetch session status');
       const session = await resp.json();
       renderSession(session);
-
       if (session.status === 'transcribed' || session.status === 'failed') {
         clearInterval(pollHandle);
         pollHandle = null;
@@ -110,64 +142,86 @@ function pollSession(id) {
       clearInterval(pollHandle);
       pollHandle = null;
     }
-  }, 3000);
+  };
+  poll();
+  pollHandle = setInterval(poll, 3000);
+}
+
+function resetSessionPanel() {
+  els.transcript.textContent = 'Transcribing…';
+  els.summaryBox.classList.add('hidden');
+  els.summaryText.textContent = '';
+  els.summaryBtn.disabled = true;
+  els.exportBtn.disabled = true;
+  els.deleteBtn.disabled = true;
 }
 
 function renderSession(session) {
   currentSessionId = session.id;
   els.sessionStatus.textContent = session.status;
   els.sessionStatus.className = 'status status-' + session.status;
+  els.deleteBtn.disabled = false;
 
   if (session.status === 'transcribed') {
     els.transcript.textContent = session.transcript;
-    els.askBtn.disabled = false;
+    els.summaryBtn.disabled = false;
     els.exportBtn.disabled = false;
-    els.recStatus.textContent = 'Idle';
   } else if (session.status === 'failed') {
+    els.transcript.textContent = '—';
     showError('Transcription failed: ' + (session.error || 'unknown error'));
-    els.recStatus.textContent = 'Idle';
   } else {
-    els.transcript.textContent = '(transcribing...)';
+    els.transcript.textContent = 'Transcribing…';
   }
 
-  els.analyses.innerHTML = '';
-  (session.analyses || []).forEach((a) => {
-    const item = document.createElement('div');
-    item.className = 'analysis-item';
-    item.innerHTML = `<div class="analysis-q">Q: ${escapeHtml(a.prompt)}</div><div class="analysis-a">${escapeHtml(a.answer)}</div>`;
-    els.analyses.prepend(item);
-  });
+  if (session.analyses && session.analyses.length > 0) {
+    const latest = session.analyses[session.analyses.length - 1];
+    els.summaryText.textContent = latest.answer;
+    els.summaryBox.classList.remove('hidden');
+  }
 }
 
-async function askPrompt() {
-  const prompt = els.promptInput.value.trim();
-  if (!prompt || !currentSessionId) return;
+async function generateSummary() {
+  if (!currentSessionId) return;
+  els.summaryBtn.disabled = true;
+  els.summaryBtn.textContent = 'Generating…';
 
-  els.askBtn.disabled = true;
   try {
     const resp = await fetch(`/api/sessions/${currentSessionId}/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt: FIXED_PROMPT }),
     });
     const body = await resp.json();
-    if (!resp.ok) throw new Error(body.error || 'Analysis failed');
+    if (!resp.ok) throw new Error(body.error || 'Summary generation failed');
 
-    const item = document.createElement('div');
-    item.className = 'analysis-item';
-    item.innerHTML = `<div class="analysis-q">Q: ${escapeHtml(body.prompt)}</div><div class="analysis-a">${escapeHtml(body.answer)}</div>`;
-    els.analyses.prepend(item);
-    els.promptInput.value = '';
+    els.summaryText.textContent = body.answer;
+    els.summaryBox.classList.remove('hidden');
   } catch (err) {
     showError(err.message);
   } finally {
-    els.askBtn.disabled = false;
+    els.summaryBtn.disabled = false;
+    els.summaryBtn.textContent = 'Generate summary';
   }
 }
 
 function exportSession() {
   if (!currentSessionId) return;
   window.location.href = `/api/sessions/${currentSessionId}/export`;
+}
+
+async function deleteSession(id) {
+  if (!confirm('Delete this recording and its transcript? This cannot be undone.')) return;
+  try {
+    const resp = await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+    if (!resp.ok) throw new Error('Failed to delete session');
+    if (currentSessionId === id) {
+      currentSessionId = null;
+      els.sessionPanel.classList.add('hidden');
+    }
+    loadSessionList();
+  } catch (err) {
+    showError(err.message);
+  }
 }
 
 async function loadSessionList() {
@@ -177,44 +231,48 @@ async function loadSessionList() {
     const sessions = await resp.json();
     sessions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
+    els.historyEmpty.classList.toggle('hidden', sessions.length > 0);
     els.sessionList.innerHTML = '';
+
     sessions.forEach((s) => {
       const li = document.createElement('li');
       const date = new Date(s.created_at).toLocaleString();
-      li.innerHTML = `<span>${date}</span><span class="status status-${s.status}">${s.status}</span>`;
-      li.addEventListener('click', () => {
-        showSessionPanel();
+
+      const main = document.createElement('div');
+      main.className = 'session-main';
+      main.innerHTML = `<span class="session-date">${date}</span><span class="status status-${s.status}">${s.status}</span>`;
+      main.addEventListener('click', () => {
+        els.sessionPanel.classList.remove('hidden');
+        resetSessionPanel();
         renderSession(s);
         if (s.status !== 'transcribed' && s.status !== 'failed') {
           pollSession(s.id);
         }
       });
+
+      const del = document.createElement('button');
+      del.className = 'session-delete';
+      del.textContent = 'Delete';
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteSession(s.id);
+      });
+
+      li.appendChild(main);
+      li.appendChild(del);
       els.sessionList.appendChild(li);
     });
   } catch (err) {
-    // Non-critical: session list is a convenience, don't block the UI on it
     console.error('Failed to load session list', err);
   }
-}
-
-function showSessionPanel() {
-  els.sessionPanel.classList.remove('hidden');
-}
-
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
 }
 
 // --- Wire up events ---
 
 els.startBtn.addEventListener('click', startRecording);
 els.stopBtn.addEventListener('click', stopRecording);
-els.askBtn.addEventListener('click', askPrompt);
+els.summaryBtn.addEventListener('click', generateSummary);
 els.exportBtn.addEventListener('click', exportSession);
-els.promptInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') askPrompt();
-});
+els.deleteBtn.addEventListener('click', () => currentSessionId && deleteSession(currentSessionId));
 
 loadSessionList();

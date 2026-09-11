@@ -121,3 +121,23 @@ func (s *Store) Update(id string, fn func(*Session)) error {
 	fn(sess)
 	return s.persist(sess)
 }
+
+func (s *Store) Delete(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sess, ok := s.cache[id]
+	if !ok {
+		return fmt.Errorf("session %s not found", id)
+	}
+
+	if sess.AudioPath != "" {
+		_ = os.Remove(sess.AudioPath)
+	}
+
+	if err := os.Remove(s.sessionFilePath(id)); err != nil {
+		return fmt.Errorf("removing session file: %w", err)
+	}
+	delete(s.cache, id)
+	return nil
+}
