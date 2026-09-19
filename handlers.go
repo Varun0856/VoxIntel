@@ -31,6 +31,7 @@ func NewApp(store *Store, t Transcriber, a Analyzer) *App {
 }
 
 func (a *App) registerRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /healthz", healthCheck)
 	mux.HandleFunc("POST /api/sessions", a.createSession)
 	mux.HandleFunc("GET /api/sessions", a.listSessions)
 	mux.HandleFunc("GET /api/sessions/{id}", a.getSession)
@@ -215,6 +216,10 @@ func createFile(path string) (*os.File, error) {
 }
 func copyBody(dst *os.File, src io.Reader) (int64, error) {
 	return io.Copy(dst, src)
+}
+
+func healthCheck(w http.ResponseWriter, r *http.Request) {
+	writeJson(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 var errNotImplemented = errors.New("not implemented")

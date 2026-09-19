@@ -11,6 +11,10 @@ func basicAuth(next http.Handler) http.Handler {
 	credentials := parseAuthUsers(os.Getenv("AUTH_USERS"))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/healthz" {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if len(credentials) == 0 {
 			http.Error(w, "server misconfigured: no AUTH_USERS set", http.StatusInternalServerError)
 			return

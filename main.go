@@ -14,7 +14,7 @@ import (
 var staticFiles embed.FS
 
 func main() {
-	loadConfigFile("config.env")
+	loadConfigFile(".env")
 	port := getEnv("PORT", "8080")
 	dataDir := getEnv("DATA_DIR", "data")
 
