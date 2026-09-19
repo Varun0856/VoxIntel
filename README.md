@@ -1,7 +1,7 @@
 # VoxIntel
 
 Records a live panel/talk from the browser, transcribes it, and generates a
-"Top Takeaways" summary on demand — built for single-operator use (one
+"Top Takeaways" summary on demand , built for single-operator use (one
 person records; others can view and export past sessions).
 
 ## How it works
@@ -28,9 +28,7 @@ Local disk (session JSON + audio files)
 ```
 
 Session data is stored as one JSON file per session under `data/sessions/`,
-with audio files under `data/audio/`. There is no external database —
-appropriate at this scale (one operator, low session volume), and it makes
-backups and manual inspection trivial.
+with audio files under `data/audio/`. There is no external database
 
 ## Running it
 
@@ -44,7 +42,7 @@ go run .
 Reads config from a `.env` file in the working directory (see below).
 Visit `http://localhost:8080`.
 
-### Docker (recommended for deployment)
+### Docker
 
 ```bash
 docker build -t voxintel .
@@ -66,7 +64,7 @@ docker run -p 8080:8080 --env-file .env -v voxintel-data:/app/data voxintel
 
 ## Configuration
 
-Copy `.env.example` to `.env` and fill in real values. All variables are
+Use this as reference to fill in the real '.env' file values. All variables are
 read from the environment (or from `.env` in the working directory, if
 present).
 
