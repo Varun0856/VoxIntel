@@ -32,8 +32,13 @@ type chatMessage struct {
 }
 
 type chatRequest struct {
-	Model    string        `json:"model"`
-	Messages []chatMessage `json:"messages"`
+	Model          string          `json:"model"`
+	Messages       []chatMessage   `json:"messages"`
+	ResponseFormat *responseFormat `json:"response_format,omitempty"`
+}
+
+type responseFormat struct {
+	Type string `json:"type"`
 }
 
 type chatResponse struct {
@@ -42,7 +47,33 @@ type chatResponse struct {
 	} `json:"choices"`
 }
 
-const systemPrompt = `You are analyzing a transcript of a recorded panel discussion or talk. Answer the user's question strictly based on the transcription content. If the transcription doesn't contain enough information to answer, say so clearly rather than guessing.`
+const systemPrompt = `Create a "Top Takeaways" section for this session that will be displayed immediately after the session ends.
+
+The purpose is NOT to summarize the session comprehensively. It is to capture the handful of ideas that an attendee should remember, photograph, and take back with them.
+
+Identify 5-7 of the strongest takeaways from the session, prioritizing:
+- Provocative or counterintuitive ideas
+- Specific insights that challenge conventional thinking
+- Practical lessons attendees can apply
+- Important observations, shifts, or implications discussed
+- Memorable points that make someone think, "That's worth remembering."
+- Any strong frameworks, principles, or distinctions introduced during the session
+
+Write each takeaway as a strong, standalone statement, followed by a short explanation if needed.
+
+Avoid:
+- Generic statements such as "Collaboration is important"
+- Session-summary language such as "The speaker discussed..."
+- Repeating the agenda or presentation structure
+- Corporate jargon and marketing language
+- Long paragraphs
+- Claims or insights that were not actually discussed in the session
+
+Use only the content provided from the session. Do not invent insights.
+
+Return your response strictly as JSON with no prose outside the JSON, in exactly this shape:
+{"takeaways":[{"statement":"...","explanation":"..."}]}
+Include 5 to 7 items. "explanation" may be an empty string if the statement stands on its own.`
 
 func (a *GroqAnalyzer) Analyze(ctx context.Context, transcript, prompt string) (string, error) {
 	const maxAttempts = 3
@@ -79,6 +110,7 @@ func (a *GroqAnalyzer) doRequest(ctx context.Context, transcript, prompt string)
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userContent},
 		},
+		ResponseFormat: &responseFormat{Type: "json_object"},
 	}
 	data, err := json.Marshal(reqBody)
 	if err != nil {

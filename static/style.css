@@ -112,6 +112,17 @@ h1 {
 .btn-outline { background: transparent; color: var(--text); border-color: var(--border); }
 .btn-text { background: transparent; color: var(--danger); border: none; padding: 0.6rem 0.4rem; }
 
+.mic-select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.88rem;
+  font-family: inherit;
+  max-width: 220px;
+}
+
 .rec-indicator {
   display: flex;
   align-items: center;
@@ -186,6 +197,44 @@ h2 {
   margin-top: 1.6rem;
   padding-top: 1.4rem;
   border-top: 1px solid var(--border);
+}
+
+/* Takeaway board — the "photographable" summary output */
+
+.takeaway-board {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.takeaway-card {
+  display: flex;
+  gap: 0.9rem;
+  align-items: baseline;
+}
+
+.takeaway-num {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-size: 1rem;
+  color: var(--accent);
+  font-weight: 600;
+  flex-shrink: 0;
+  width: 1.4rem;
+}
+
+.takeaway-statement {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-size: 1.08rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.takeaway-explanation {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin: 0.3rem 0 0;
 }
 
 .empty-note {

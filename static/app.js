@@ -1,8 +1,9 @@
-const FIXED_PROMPT = "Generate a concise summary of the key takeaways and any action items from this discussion.";
+const FIXED_PROMPT = "Generate the Top Takeaways for this session.";
 
 const els = {
   startBtn: document.getElementById('startBtn'),
   stopBtn: document.getElementById('stopBtn'),
+  micSelect: document.getElementById('micSelect'),
   recDot: document.getElementById('recDot'),
   recStatus: document.getElementById('recStatus'),
   sessionPanel: document.getElementById('sessionPanel'),
@@ -54,12 +55,50 @@ function showError(msg) {
   setTimeout(() => els.errorBanner.classList.add('hidden'), 6000);
 }
 
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// --- Microphone / audio input device list ---
+// Populates the dropdown with every audio input the OS sees — laptop mic,
+// USB audio interface, a line-in cable from a mixer, etc. Browsers hide
+// device *names* until mic permission has been granted once, so we quickly
+// request+release access first just to unlock the labels.
+
+async function populateMicList() {
+  try {
+    const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    tempStream.getTracks().forEach((t) => t.stop());
+
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const mics = devices.filter((d) => d.kind === 'audioinput');
+
+    els.micSelect.innerHTML = '';
+    mics.forEach((d, i) => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || `Microphone ${i + 1}`;
+      els.micSelect.appendChild(opt);
+    });
+  } catch (err) {
+    console.error('Could not list audio devices', err);
+  }
+}
+
+navigator.mediaDevices.addEventListener('devicechange', populateMicList);
+populateMicList();
+
 // --- Recording ---
 
 async function startRecording() {
   let stream;
+  const constraints = {
+    audio: els.micSelect.value ? { deviceId: { exact: els.micSelect.value } } : true,
+  };
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
   } catch (err) {
     showError('Microphone access denied or unavailable: ' + err.message);
     return;
@@ -150,7 +189,7 @@ function pollSession(id) {
 function resetSessionPanel() {
   els.transcript.textContent = 'Transcribing…';
   els.summaryBox.classList.add('hidden');
-  els.summaryText.textContent = '';
+  els.summaryText.innerHTML = '';
   els.summaryBtn.disabled = true;
   els.exportBtn.disabled = true;
   els.deleteBtn.disabled = true;
@@ -175,9 +214,38 @@ function renderSession(session) {
 
   if (session.analyses && session.analyses.length > 0) {
     const latest = session.analyses[session.analyses.length - 1];
-    els.summaryText.textContent = latest.answer;
+    renderTakeaways(latest.answer);
     els.summaryBox.classList.remove('hidden');
   }
+}
+
+// Renders the model's JSON takeaways response as a numbered card board.
+// Falls back to plain text if the response isn't valid JSON for some
+// reason, so a parsing hiccup never just shows a blank box.
+function renderTakeaways(rawAnswer) {
+  els.summaryText.innerHTML = '';
+  let parsed;
+  try {
+    parsed = JSON.parse(rawAnswer);
+  } catch {
+    els.summaryText.textContent = rawAnswer;
+    return;
+  }
+
+  const board = document.createElement('div');
+  board.className = 'takeaway-board';
+  (parsed.takeaways || []).forEach((t, i) => {
+    const card = document.createElement('div');
+    card.className = 'takeaway-card';
+    card.innerHTML = `
+      <span class="takeaway-num">${i + 1}</span>
+      <div>
+        <p class="takeaway-statement">${escapeHtml(t.statement)}</p>
+        ${t.explanation ? `<p class="takeaway-explanation">${escapeHtml(t.explanation)}</p>` : ''}
+      </div>`;
+    board.appendChild(card);
+  });
+  els.summaryText.appendChild(board);
 }
 
 async function generateSummary() {
@@ -194,7 +262,7 @@ async function generateSummary() {
     const body = await resp.json();
     if (!resp.ok) throw new Error(body.error || 'Summary generation failed');
 
-    els.summaryText.textContent = body.answer;
+    renderTakeaways(body.answer);
     els.summaryBox.classList.remove('hidden');
   } catch (err) {
     showError(err.message);

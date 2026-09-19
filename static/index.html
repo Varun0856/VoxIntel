@@ -25,6 +25,7 @@
       <div class="recorder-row">
         <button id="startBtn" class="btn btn-primary">Start recording</button>
         <button id="stopBtn" class="btn btn-outline" disabled>Stop recording</button>
+        <select id="micSelect" class="mic-select" title="Audio input source"></select>
         <span class="rec-indicator">
           <span id="recDot" class="dot hidden"></span>
           <span id="recStatus">Idle</span>
@@ -46,8 +47,8 @@
       </div>
 
       <div id="summaryBox" class="summary-box hidden">
-        <h2>Summary</h2>
-        <p id="summaryText" class="transcript-text"></p>
+        <h2>Top Takeaways</h2>
+        <div id="summaryText"></div>
       </div>
     </section>
 

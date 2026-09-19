@@ -1,13 +1,20 @@
 package main
 
 import (
+	"embed"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
+//go:embed static
+var staticFiles embed.FS
+
 func main() {
+	loadConfigFile("config.env")
 	port := getEnv("PORT", "8080")
 	dataDir := getEnv("DATA_DIR", "data")
 
@@ -35,13 +42,17 @@ func main() {
 	analyzer := NewGroqAnalyzer(analyzeAPIKey, analyzeBaseURL, analyzeModel)
 
 	app := NewApp(store, transcriber, analyzer)
+	staticFS, err := fs.Sub(staticFiles, "static")
+	if err != nil {
+		log.Fatalf("failed to load embedded static files: %v", err)
+	}
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.Dir("static")))
+	mux.Handle("/", http.FileServer(http.FS(staticFS)))
 	app.registerRoutes(mux)
 
 	server := &http.Server{
 		Addr:         ":" + port,
-		Handler:      mux,
+		Handler:      basicAuth(mux),
 		ReadTimeout:  15 * time.Minute,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -58,4 +69,25 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func loadConfigFile(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key, val := strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
+		if os.Getenv(key) == "" {
+			os.Setenv(key, val)
+		}
+	}
 }
