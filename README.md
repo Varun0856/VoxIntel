@@ -1,7 +1,7 @@
 # VoxIntel
 
 Records a live panel/talk from the browser, transcribes it, and generates a
-"Top Takeaways" summary on demand , built for single-operator use (one
+"Top Takeaways" summary on demand, built for single-operator use (one
 person records; others can view and export past sessions).
 
 ## How it works
@@ -28,25 +28,48 @@ Local disk (session JSON + audio files)
 ```
 
 Session data is stored as one JSON file per session under `data/sessions/`,
-with audio files under `data/audio/`. There is no external database
+with audio files under `data/audio/`. There is no external database —
+appropriate at this scale (one operator, low session volume), and it makes
+backups and manual inspection trivial.
 
 ## Running it
+
+A `Makefile` wraps the common commands:
+
+| Command             | Does                                                                |
+| ------------------- | ------------------------------------------------------------------- |
+| `make build`        | Compiles the binary (`./voxintel`)                                  |
+| `make run`          | Runs locally via `go run .`                                         |
+| `make test`         | Runs the test suite                                                 |
+| `make test-race`    | Runs tests with the race detector (checks concurrent access safety) |
+| `make vet`          | Runs `go vet`                                                       |
+| `make fmt`          | Lists any files not matching `gofmt`                                |
+| `make docker-build` | Builds the Docker image                                             |
+| `make docker-run`   | Runs the container, with a named volume for persistent session data |
+| `make clean`        | Removes the compiled binary                                         |
 
 ### Local development
 
 ```bash
-go build ./...
-go run .
+make build
+make run
 ```
 
 Reads config from a `.env` file in the working directory (see below).
 Visit `http://localhost:8080`.
 
-### Docker
+### Docker (recommended for deployment)
+
+```bash
+make docker-build
+make docker-run
+```
+
+Equivalent to, if you need the raw commands (e.g. to adjust flags):
 
 ```bash
 docker build -t voxintel .
-docker run -p 8080:8080 --env-file .env voxintel
+docker run -p 8080:8080 --env-file .env -v voxintel-data:/app/data voxintel
 ```
 
 The container is a multi-stage build — the final image contains only the
@@ -62,15 +85,21 @@ volume there if you need it to survive container restarts/redeploys:**
 docker run -p 8080:8080 --env-file .env -v voxintel-data:/app/data voxintel
 ```
 
+## Continuous integration
+
+Every push/PR to `main` runs `go build`, `go vet`, `go test -race`, and a
+`gofmt` check via GitHub Actions (`.github/workflows/ci.yml`). Check the
+**Actions** tab on the repo for current status.
+
 ## Configuration
 
-Use this as reference to fill in the real '.env' file values. All variables are
+`.env.example` to `.env` and fill in real values. All variables are
 read from the environment (or from `.env` in the working directory, if
 present).
 
 | Variable              | Required | Default                          | Purpose                                                                                                                                       |
 | --------------------- | -------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AUTH_USERS`          | Yes      | —                                | Comma-separated `user:password` pairs for HTTP Basic Auth, e.g. `uncle:pass1,varun:pass2`. Give each person their own login.                  |
+| `AUTH_USERS`          | Yes      | —                                | Comma-separated `user:password` pairs for HTTP Basic Auth, e.g. `anant:pass1,varun:pass2`. Give each person their own login.                  |
 | `TRANSCRIBE_API_KEY`  | Yes      | —                                | API key for the Whisper-compatible transcription endpoint (Groq or OpenAI).                                                                   |
 | `ANALYZE_API_KEY`     | Yes      | —                                | API key for the chat-completions endpoint used to generate takeaways (Groq or OpenAI).                                                        |
 | `TRANSCRIBE_BASE_URL` | No       | `https://api.groq.com/openai/v1` | Base URL for the transcription API.                                                                                                           |
