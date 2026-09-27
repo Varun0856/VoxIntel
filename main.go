@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -58,10 +61,24 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	log.Printf("VoxIntel listening on :%s (data dir: %s)", port, dataDir)
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatalf("server error: %v", err)
+	go func() {
+		log.Printf("VoxIntel listening on :%s (data dir: %s)", port, dataDir)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	<-stop
+
+	log.Println("shutting down gracefully...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("forced shutdown: %v", err)
 	}
+	log.Println("shutdown complete")
 }
 
 func getEnv(key, fallback string) string {

@@ -87,7 +87,7 @@ func (c *WhisperClient) doRequest(ctx context.Context, audioPath string) (string
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		c.baseURL+"/audio/transcriptions", &body)
 	if err != nil {
-		return "", fmt.Errorf("building request: 5w", err)
+		return "", fmt.Errorf("building request: %w", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
